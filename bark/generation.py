@@ -18,14 +18,15 @@ from .model import GPTConfig, GPT
 from .model_fine import FineGPT, FineGPTConfig
 
 if (
-    torch.cuda.is_available() and
-    hasattr(torch.cuda, "amp") and
-    hasattr(torch.cuda.amp, "autocast") and
-    hasattr(torch.cuda, "is_bf16_supported") and
-    torch.cuda.is_bf16_supported()
+    torch.cuda.is_available()
+    and hasattr(torch.cuda, "amp")
+    and hasattr(torch.cuda.amp, "autocast")
+    and hasattr(torch.cuda, "is_bf16_supported")
+    and torch.cuda.is_bf16_supported()
 ):
     autocast = funcy.partial(torch.cuda.amp.autocast, dtype=torch.bfloat16)
 else:
+
     @contextlib.contextmanager
     def autocast():
         yield
@@ -86,7 +87,7 @@ CACHE_DIR = os.path.join(os.getenv("XDG_CACHE_HOME", default_cache_dir), "suno",
 
 
 def _cast_bool_env_var(s):
-    return s.lower() in ('true', '1', 't')
+    return s.lower() in ("true", "1", "t")
 
 
 USE_SMALL_MODELS = _cast_bool_env_var(os.environ.get("SUNO_USE_SMALL_MODELS", "False"))
@@ -122,10 +123,10 @@ REMOTE_MODEL_PATHS = {
 }
 
 
-if not hasattr(torch.nn.functional, 'scaled_dot_product_attention') and torch.cuda.is_available():
+if not hasattr(torch.nn.functional, "scaled_dot_product_attention") and torch.cuda.is_available():
     logger.warning(
-        "torch version does not support flash attention. You will get faster" +
-        " inference speed by upgrade torch to newest nightly version."
+        "torch version does not support flash attention. You will get faster"
+        + " inference speed by upgrade torch to newest nightly version."
     )
 
 
@@ -209,7 +210,7 @@ def _load_model(ckpt_path, device, use_small=False, model_type="text"):
     if not os.path.exists(ckpt_path):
         logger.info(f"{model_type} model not found, downloading into `{CACHE_DIR}`.")
         _download(model_info["repo_id"], model_info["file_name"])
-    checkpoint = torch.load(ckpt_path, map_location=device)
+    checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
     # this is a hack
     model_args = checkpoint["model_args"]
     if "input_vocab_size" not in model_args:
@@ -365,9 +366,9 @@ def _load_history_prompt(history_prompt_input):
             os.path.join(CUR_PATH, "assets", "prompts", f"{history_prompt_input}.npz")
         )
     elif isinstance(history_prompt_input, dict):
-        assert("semantic_prompt" in history_prompt_input)
-        assert("coarse_prompt" in history_prompt_input)
-        assert("fine_prompt" in history_prompt_input)
+        assert "semantic_prompt" in history_prompt_input
+        assert "coarse_prompt" in history_prompt_input
+        assert "fine_prompt" in history_prompt_input
         history_prompt = history_prompt_input
     else:
         raise ValueError("history prompt format unrecognized")
@@ -437,9 +438,9 @@ def generate_text_semantic(
     else:
         semantic_history = np.array([SEMANTIC_PAD_TOKEN] * 256)
     x = torch.from_numpy(
-        np.hstack([
-            encoded_text, semantic_history, np.array([SEMANTIC_INFER_TOKEN])
-        ]).astype(np.int64)
+        np.hstack([encoded_text, semantic_history, np.array([SEMANTIC_INFER_TOKEN])]).astype(
+            np.int64
+        )
     )[None]
     assert x.shape[1] == 256 + 256 + 1
     with _inference_mode():
@@ -644,12 +645,8 @@ def generate_coarse(
                     x_input = x_in
 
                 logits, kv_cache = model(x_input, use_cache=use_kv_caching, past_kv=kv_cache)
-                logit_start_idx = (
-                    SEMANTIC_VOCAB_SIZE + (1 - int(is_major_step)) * CODEBOOK_SIZE
-                )
-                logit_end_idx = (
-                    SEMANTIC_VOCAB_SIZE + (2 - int(is_major_step)) * CODEBOOK_SIZE
-                )
+                logit_start_idx = SEMANTIC_VOCAB_SIZE + (1 - int(is_major_step)) * CODEBOOK_SIZE
+                logit_end_idx = SEMANTIC_VOCAB_SIZE + (2 - int(is_major_step)) * CODEBOOK_SIZE
                 relevant_logits = logits[0, 0, logit_start_idx:logit_end_idx]
                 if top_p is not None:
                     # faster to convert to numpy
@@ -781,9 +778,9 @@ def generate_fine(
                 del logits, codebook_preds
             # transfer over info into model_in and convert to numpy
             for nn in range(n_coarse, N_FINE_CODEBOOKS):
-                in_arr[
-                    start_fill_idx : start_fill_idx + (1024 - rel_start_fill_idx), nn
-                ] = in_buffer[0, rel_start_fill_idx:, nn]
+                in_arr[start_fill_idx : start_fill_idx + (1024 - rel_start_fill_idx), nn] = (
+                    in_buffer[0, rel_start_fill_idx:, nn]
+                )
             del in_buffer
         gen_fine_arr = in_arr.detach().cpu().numpy().squeeze().T
         del in_arr
